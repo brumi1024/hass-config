@@ -8,14 +8,15 @@ This repository manages Home Assistant configuration files with automated valida
 
 ## Project Structure
 
-- `config/` - Contains all Home Assistant configuration files (synced from HA instance)
-- `tools/` - Validation and testing scripts
-- `venv/` - Python virtual environment with dependencies
-- `temp/` - Temporary directory for Claude to write and test code before moving to final locations
-- `Makefile` - Commands for pulling/pushing configuration
-- `.claude-code/` - Project-specific Claude Code settings and hooks
-  - `hooks/` - Validation hooks that run automatically
-  - `settings.json` - Project configuration
+- `config/` - Home Assistant configuration files synced from the HA instance
+- `tools/` - Python validators, entity explorer, test runner
+- `tests/` - pytest suite for the validators
+- `venv/` - Python virtual environment (gitignored)
+- `Makefile` - `pull` / `push` / `validate` / `entities` targets
+- `Makefile.dev` - dev workflow targets (`dev-test`, `dev-format`, `dev-workflow`)
+- `.env` - HA host, SSH, token (gitignored; see `.env.example`)
+- `.claude-code/` - hooks (post-edit, pre-push) and project settings
+- `.rsync-excludes-pull`, `.rsync-excludes-push` - rsync filters per direction
 
 ## Rsync Architecture
 
@@ -29,6 +30,8 @@ This project uses **two separate exclude files** for different sync operations:
 **Why separate files?**
 - `make pull` downloads most files including `.storage/` (excluding sensitive auth files) for local reference
 - `make push` writes never overwrites HA's runtime state (`.storage/`)
+
+**Gotcha — auth file exclude pattern:** Both exclude files must match `.storage/auth` (flat file) AND `.storage/auth/` (dir form). Some HA installs ship `auth` as a single file; the dir-only pattern silently leaks credentials. The same trap applies to other `.storage/` entries where HA's layout varies between versions.
 
 ## What This Repo Can and Cannot Manage
 
@@ -69,6 +72,10 @@ needed, make them manually in the Home Assistant UI:
 1. Reload the relevant HA components (automations, scenes, scripts)
 2. Verify changes took effect in HA
 
+### Pull/Push Discipline
+- **Pull only at session start, never between edits.** `make pull` runs `rsync --delete` and silently overwrites uncommitted local edits. If you've started editing, finish and `make push` before pulling again.
+- The HA host is the source of truth for `.storage/`, dashboards, and anything HA mutates at runtime.
+
 ## Available Commands
 
 ### Configuration Management
@@ -93,13 +100,7 @@ needed, make them manually in the Home Assistant UI:
 
 ## Validation System
 
-This project includes comprehensive validation to prevent invalid configurations:
-
-### Core Goal
-
-- Verify all agent-produced configuration and automation changes before saving YAML files to Home Assistant
-- Never generate, save, or push YAML changes that fail validation
-- Use a layered validation suite that combines Home Assistant's own validation with repository-specific validators
+A layered suite that runs both Home Assistant's own validation and repo-specific checks. Goal: never save or push YAML that fails validation.
 
 1. **YAML Syntax Validation** - Ensures proper YAML syntax with HA-specific tags
 2. **Entity Reference Validation** - Checks that all referenced entities/devices exist
@@ -113,11 +114,8 @@ This project includes comprehensive validation to prevent invalid configurations
 
 ## Home Assistant Instance Details
 
-- **Host**: Configure in Makefile `HA_HOST` variable
-- **User**: Configure SSH access as needed
-- **SSH Key**: Configure SSH key authentication
-- **Config Path**: /config/ (standard HA path)
-- **Version**: Compatible with Home Assistant Core 2024.x+
+- **Host / SSH user / token**: configured in `.env` (see `.env.example`). SSH key resolution typically via `~/.ssh/config`.
+- **Remote config path**: `/config/` (standard HA path).
 
 ## Entity Registry
 
@@ -137,12 +135,9 @@ The system tracks entities across these domains:
 
 ## Important Notes
 
-- **Never push without validation**: The hooks prevent this, but be aware
 - **Blueprint files** use `!input` tags which are normal and expected
 - **Secrets are skipped** during validation for security
-- **SSH access required** for pull/push operations
-- **Python venv required** for validation tools
-- All python tools need to be run with `source venv/bin/activate && python <tool_path>`
+- All python tools require the venv: `source venv/bin/activate && python <tool_path>`
 
 ## Troubleshooting
 
@@ -159,14 +154,12 @@ The system tracks entities across these domains:
 
 ### Missing Dependencies
 1. Activate venv: `source venv/bin/activate`
-2. Install requirements: `pip install homeassistant voluptuous pyyaml`
+2. Install requirements: `pip install -r requirements-dev.txt`
 
 ## Security
 
-- **SSH keys** are used for secure access
-- **Secrets.yaml** is excluded from validation (contains sensitive data)
-- **No credentials** are stored in this repository
-- **Access tokens** in config are for authorized integrations
+- `config/secrets.yaml` and `config/.storage/` are gitignored — never commit them
+- Validators skip `secrets.yaml` (would otherwise leak in error messages)
 
 ## Entity Naming Convention
 
