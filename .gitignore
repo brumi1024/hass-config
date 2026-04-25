@@ -1,4 +1,5 @@
 # Home Assistant Configuration Management - .gitignore
+# Home Assistant Configuration Management - .gitignore
 
 # Secrets and sensitive data
 config/secrets.yaml
@@ -89,6 +90,9 @@ config/.shopping_list.json
 config/.google.token
 config/nest/
 config/.cloud/
+config/.ha_run.lock
+config/logs/
+config/.superpowers/
 
 # Custom components (managed by HACS)
 config/custom_components/

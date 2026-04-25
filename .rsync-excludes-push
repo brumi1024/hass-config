@@ -41,3 +41,10 @@ www/
 # All changes should be made via HA UI or API
 # ===========================================
 .storage/
+
+# Local-only template
+secrets.yaml.example
+
+# Runtime artifacts (local-only)
+.ha_run.lock
+logs/
